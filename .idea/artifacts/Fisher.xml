@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Fisher">
+    <output-path>$PROJECT_DIR$/out/artifacts/Fisher</output-path>
+    <root id="archive" name="Fisher.jar">
+      <element id="module-output" name="Veijon Fisheri" />
+    </root>
+  </artifact>
+</component>
