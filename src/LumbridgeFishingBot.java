@@ -44,33 +44,53 @@ public class LumbridgeFishingBot extends Script {
             return random(2000, 3000);
         }
 
-        // Find the nearest fishing spot
-        NPC fishingSpot = getNpcs().closest(npc -> npc != null && npc.hasAction("Net") && fishingArea.contains(npc));
+        // Find all available fishing spots within the fishing area
+        List<NPC> fishingSpots = getNpcs().filter(npc -> npc != null && npc.hasAction("Net") && fishingArea.contains(npc));
 
-        if (fishingSpot != null && !myPlayer().isAnimating()) {
-            setStatus("Fishing...");
-            if (fishingSpot.interact("Net")) {
-                new ConditionalSleep(5000) {
-                    @Override
-                    public boolean condition() throws InterruptedException {
-                        return myPlayer().isAnimating(); // Wait until the player starts fishing
-                    }
-                }.sleep();
+        if (!fishingSpots.isEmpty()) {
+            // If there are fishing spots, interact with the nearest one
+            NPC nearestSpot = fishingSpots.stream().min((npc1, npc2) -> {
+                int dist1 = myPlayer().getPosition().distance(npc1.getPosition());
+                int dist2 = myPlayer().getPosition().distance(npc2.getPosition());
+                return Integer.compare(dist1, dist2);
+            }).orElse(null);
+
+            if (nearestSpot != null) {
+                setStatus("Fishing...");
+                if (nearestSpot.interact("Net")) {
+                    new ConditionalSleep(5000) {
+                        @Override
+                        public boolean condition() throws InterruptedException {
+                            return myPlayer().isAnimating(); // Wait until the player starts fishing
+                        }
+                    }.sleep();
+                }
             }
         } else {
-            setStatus("No fishing spot found, moving or repositioning...");
-            getWalking().webWalk(fishingArea); // Walk to the fishing area
+            setStatus("No fishing spots found, moving or repositioning...");
+            // Walk to the fishing area and refresh position if needed
+            getWalking().webWalk(fishingArea);
 
             // Random movement to refresh fishing spot visibility
             Position currentPos = myPlayer().getPosition();
-            Position newPos = currentPos.translate(random(-1, 1), random(-1, 1));
+            Position newPos = currentPos.translate(random(-2, 2), random(-2, 2));
             getWalking().walk(newPos);
+
+            // Wait for a short period to allow fishing spots to reappear
+            new ConditionalSleep(5000) {
+                @Override
+                public boolean condition() throws InterruptedException {
+                    // Check if any fishing spots have appeared
+                    return !getNpcs().filter(npc -> npc != null && npc.hasAction("Net") && fishingArea.contains(npc)).isEmpty();
+                }
+            }.sleep();
         }
 
         return random(500, 1000);
     }
 
     private void dropFish() throws InterruptedException {
+        // Check if the player is animating
         if (myPlayer().isAnimating()) {
             Position currentPos = myPlayer().getPosition();
             Position newPos = currentPos.translate(random(-2, 2), random(-2, 2));
@@ -83,13 +103,20 @@ public class LumbridgeFishingBot extends Script {
             }.sleep();
         }
 
+        // Press and hold the Shift key
+        getKeyboard().pressKey(java.awt.event.KeyEvent.VK_SHIFT);
+
+        // Drop all items in the inventory that are fish
         for (Item item : getInventory().getItems()) {
             if (item != null && fishNames.contains(item.getName())) {
                 fishCaught++;
-                item.interact("Drop");
+                item.interact("Drop"); // Left-click to drop item
                 sleep(random(500, 1000));
             }
         }
+
+        // Release the Shift key
+        getKeyboard().releaseKey(java.awt.event.KeyEvent.VK_SHIFT);
     }
 
     private void setStatus(String newStatus) {
